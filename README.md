@@ -1,87 +1,61 @@
 # pymetrics-assessment-api-client
 A client library for accessing pymetrics Assessment API
 
+## Installation
+
+```bash
+pip install pymetrics-assessment-api-client
+```
+
 ## Usage
-First, create a client:
+
+A full set of examples can be found in the [pymetrics-assessments-api-client examples directory](https://github.com/pymetrics/pymetrics_assessment_api_client/tree/main/pymetrics_assessment_api_client/examples).
+
+To get started, please request Client ID, Client Secret and API Key from pymetrics.
+
+First, create a client for staging environment:
 
 ```python
 from pymetrics_assessment_api_client import Client
 
-client = Client(base_url="https://api.example.com")
+client = Client(base_url="https://staging.pymetrics.com")
 ```
 
-If the endpoints you're going to hit require authentication, use `AuthenticatedClient` instead:
-
+To get an authenticated token, you can hit the get oauth endpoint by doing the following:
 ```python
-from pymetrics_assessment_api_client import AuthenticatedClient
-
-client = AuthenticatedClient(base_url="https://api.example.com", token="SuperSecretToken")
-```
-
-Now call your endpoint and use your models:
-
-```python
-from pymetrics_assessment_api_client.models import MyDataModel
-from pymetrics_assessment_api_client.api.my_tag import get_my_data_model
+from pymetrics_assessment_api_client.models import OAuthTokenRequest
+from pymetrics_assessment_api_client.api.default import mercury_o_auth
+from pymetrics_assessment_api_client.models import OAuthTokenResponse
 from pymetrics_assessment_api_client.types import Response
 
-my_data: MyDataModel = get_my_data_model.sync(client=client)
-# or if you need more info (e.g. status_code)
-response: Response[MyDataModel] = get_my_data_model.sync_detailed(client=client)
+request = OAuthTokenRequest(client_id=client_id,
+                            client_secret=client_secret,
+                            grant_type="client_credentials")
+auth_response: Response = mercury_o_auth.sync_detailed(client=client,
+                                                       json_body=request)
+auth_token_response: OAuthTokenResponse = auth_response.parsed
+print(f"Access Token: {auth_token_response.access_token}")
 ```
-
-Or do the same thing with an async version:
-
+To retrieve an order, you can use the token generated above and hit the get order endpoint:
 ```python
-from pymetrics_assessment_api_client.models import MyDataModel
-from pymetrics_assessment_api_client.api.my_tag import get_my_data_model
+from pymetrics_assessment_api_client.api.default import mercury_retrieve_order
+from pymetrics_assessment_api_client.models import MercuryAssessmentOrder
 from pymetrics_assessment_api_client.types import Response
 
-my_data: MyDataModel = await get_my_data_model.asyncio(client=client)
-response: Response[MyDataModel] = await get_my_data_model.asyncio_detailed(client=client)
-```
+auth = f"Bearer {access_token}"
 
-By default, when you're calling an HTTPS API it will attempt to verify that SSL is working correctly. Using certificate verification is highly recommended most of the time, but sometimes you may need to authenticate to a server (especially an internal server) using a custom certificate bundle.
-
-```python
-client = AuthenticatedClient(
-    base_url="https://internal_api.example.com", 
-    token="SuperSecretToken",
-    verify_ssl="/path/to/certificate_bundle.pem",
+get_order_response: Response = mercury_retrieve_order.sync_detailed(
+    client=client,
+    uuid=order_uuid,
+    authorization=auth,
+    x_api_key=API_KEY,
+    report=False
 )
+parsed_get_order_response: MercuryAssessmentOrder = get_order_response.parsed
+print(f"Successfully retrieved order: {parsed_get_order_response.to_dict()}")
 ```
 
-You can also disable certificate validation altogether, but beware that **this is a security risk**.
+## Base URLs
+US Production: https://www.pymetrics.com
 
-```python
-client = AuthenticatedClient(
-    base_url="https://internal_api.example.com", 
-    token="SuperSecretToken", 
-    verify_ssl=False
-)
-```
-
-Things to know:
-1. Every path/method combo becomes a Python module with four functions:
-    1. `sync`: Blocking request that returns parsed data (if successful) or `None`
-    1. `sync_detailed`: Blocking request that always returns a `Request`, optionally with `parsed` set if the request was successful.
-    1. `asyncio`: Like `sync` but the async instead of blocking
-    1. `asyncio_detailed`: Like `sync_detailed` by async instead of blocking
-
-1. All path/query params, and bodies become method arguments.
-1. If your endpoint had any tags on it, the first tag will be used as a module name for the function (my_tag above)
-1. Any endpoint which did not have a tag will be in `pymetrics_assessment_api_client.api.default`
-
-## Building / publishing this Client
-This project uses [Poetry](https://python-poetry.org/) to manage dependencies  and packaging.  Here are the basics:
-1. Update the metadata in pyproject.toml (e.g. authors, version)
-1. If you're using a private repository, configure it with Poetry
-    1. `poetry config repositories.<your-repository-name> <url-to-your-repository>`
-    1. `poetry config http-basic.<your-repository-name> <username> <password>`
-1. Publish the client with `poetry publish --build -r <your-repository-name>` or, if for public PyPI, just `poetry publish --build`
-
-If you want to install this client into another project without publishing it (e.g. for development) then:
-1. If that project **is using Poetry**, you can simply do `poetry add <path-to-this-client>` from that project
-1. If that project is not using Poetry:
-    1. Build a wheel with `poetry build -f wheel`
-    1. Install that wheel from the other project `pip install <path-to-wheel>`
+US Staging: https://staging.pymetrics.com
